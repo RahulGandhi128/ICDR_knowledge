@@ -185,7 +185,7 @@ def load_vector_store_from_github():
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
     
     # Base URL for raw GitHub content
-    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/"
+    repo_base_url = "https://github.com/RahulGandhi128/ICDR_knowledge/raw/refs/heads/main/faiss_index_icdr/index.faiss"
     
     faiss_file_name = "index.faiss"
     pkl_file_name = "index.pkl"

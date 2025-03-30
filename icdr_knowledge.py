@@ -12,6 +12,9 @@ from langchain.chains.question_answering import load_qa_chain
 from io import BytesIO
 import streamlit as st
 from PIL import Image
+import requests
+from pathlib import Path
+import pickle
 
 # Add after imports
 # Set wide layout
@@ -152,36 +155,27 @@ def update_vector_store(text_chunks):
 def load_documents(chunk_document=True): # Added chunk_document parameter to control chunking
     all_text = ""
 
-    # List of PDF files to add permanently
-    pdf_files = [r"C:\Users\Asus\OneDrive\Desktop\New_berry\1717132711878.pdf"] # Replace with your actual PDF path if needed, or keep it as is if the path is correct
-    print(f"Loading PDF files: {pdf_files}") # DEBUGGING STEP 1: Check if load_documents is called and PDF list
-
-    for pdf in pdf_files:
-        print(f"Processing PDF: {pdf}") # DEBUGGING STEP 2: Check if loop starts and PDF path is printed
-        try:  # Added try-except to catch file opening errors
-            with open(pdf, "rb") as file:
-                pdf_text = extract_text_from_pdf(file)
-                print(f"Text extracted from PDF, length: {len(pdf_text)}") # DEBUGGING STEP 3: Check if text is extracted and length
-                all_text += pdf_text
-        except Exception as e:
-            print(f"Error opening or processing PDF {pdf}: {e}") # DEBUGGING STEP 4: Catch PDF errors
-
-    # # List of URLs to add permanently # Removed URL loading
-    # urls = []
-    # for url in urls:  # No changes needed for URLs if you're not using them currently
-    #     all_text += extract_text_from_url(url)
+    # GitHub URL for the PDF
+    pdf_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/1717132711878.pdf"
+    
+    try:
+        pdf_file = download_file_from_github(pdf_url, "1717132711878.pdf")
+        pdf_text = extract_text_from_pdf(pdf_file)
+        all_text += pdf_text
+        print(f"Text extracted from PDF, length: {len(all_text)}")
+    except Exception as e:
+        print(f"Error processing PDF from GitHub: {e}")
+        return False
 
     # Process and store documents in FAISS
     if chunk_document:
-        text_chunks = get_text_chunks(all_text, chunking_enabled=True) # Chunking enabled by default
-        print(f"Text chunking ENABLED. Number of text chunks created: {len(text_chunks)}") # DEBUGGING STEP 5a: Chunking enabled message
+        text_chunks = get_text_chunks(all_text, chunking_enabled=True)
+        print(f"Text chunking ENABLED. Number of text chunks created: {len(text_chunks)}")
     else:
-        text_chunks = get_text_chunks(all_text, chunking_enabled=False) # Chunking disabled
-        print(f"Text chunking DISABLED. Treating document as single chunk.") # DEBUGGING STEP 5b: Chunking disabled message
+        text_chunks = get_text_chunks(all_text, chunking_enabled=False)
+        print(f"Text chunking DISABLED. Treating document as single chunk.")
 
-
-    update_vector_store(text_chunks)
-    print("FAISS index updated.") # DEBUGGING STEP 6: Confirm FAISS update
+    return update_vector_store(text_chunks)
 
 
 # Compliance check function
@@ -213,30 +207,54 @@ def get_compliance_chain():
 
 # Function to check compliance against stored regulatory documents
 def check_compliance(user_submission):
-    embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-    vector_store = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
+        
+        # Load vector store from GitHub
+        vector_store = load_vector_store_from_github()
+        if vector_store is None:
+            return {"output_text": "Failed to load knowledge base."}, []
 
-    print(f"User Submission for Similarity Search: '{user_submission}'") # DEBUGGING STEP 7: Print user submission
-    # Retrieve relevant regulatory content for evaluation
-    relevant_docs = vector_store.similarity_search(user_submission, k=25)
-    print(f"Number of relevant documents retrieved: {len(relevant_docs)}") # DEBUGGING STEP 8: Check number of retrieved docs
+        print(f"User Submission for Similarity Search: '{user_submission}'")
+        relevant_docs = vector_store.similarity_search(user_submission, k=25)
+        
+        if not relevant_docs:
+            print("No relevant documents found by similarity search!")
+        else:
+            print(f"Number of relevant documents retrieved: {len(relevant_docs)}")
+            print(f"First document preview: {relevant_docs[0].page_content[:200]}...")
 
-    if not relevant_docs: # DEBUGGING STEP 9: Check if no docs are retrieved
-        print("No relevant documents found by similarity search!")
-    else:
-        print("First retrieved document (for debugging):") # DEBUGGING STEP 10: Print content of first retrieved doc
-        print(f"Page Content (first 200 chars): {relevant_docs[0].page_content[:200]}...")
+        chain = get_compliance_chain()
+        response = chain({"input_documents": relevant_docs, "submission": user_submission}, return_only_outputs=True)
 
-
-    # Run compliance check
-    chain = get_compliance_chain()
-    response = chain({"input_documents": relevant_docs, "submission": user_submission}, return_only_outputs=True)
-
-    return response, relevant_docs
+        return response, relevant_docs
+    except Exception as e:
+        return {"output_text": f"Error processing query: {str(e)}"}, []
 
 # Run this once to store compliance documents permanently (Only run this once initially, or when you update documents)
 # load_documents()  # Commented out after initial loading. Uncomment to reload documents if needed.
 
+def download_file_from_github(url, local_filename):
+    """Download a file from GitHub raw content URL"""
+    # Convert GitHub blob URL to raw content URL
+    raw_url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
+    
+    response = requests.get(raw_url)
+    if response.status_code == 200:
+        return BytesIO(response.content)
+    else:
+        raise Exception(f"Failed to download file from {url}")
+
+def load_vector_store_from_github():
+    """Load FAISS vector store from GitHub"""
+    vector_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/index.pkl"
+    try:
+        vector_data = download_file_from_github(vector_url, "index.pkl")
+        with vector_data as f:
+            return pickle.load(f)
+    except Exception as e:
+        st.error(f"Error loading vector store: {str(e)}")
+        return None
 
 def run_chatbot():
     display_logo()
@@ -279,20 +297,13 @@ def run_chatbot():
 
 
 if __name__ == "__main__":
-    use_chunking = True
-    
     try:
         import faiss
     except ImportError:
         st.error("Please install FAISS first: pip install faiss-cpu")
         st.stop()
     
-    # Load documents if ICDR-specific FAISS index doesn't exist
-    if not os.path.exists(FAISS_INDEX_PATH):
-        print(f"Initial FAISS index creation for ICDR at: {FAISS_INDEX_PATH}")
-        if not load_documents(chunk_document=use_chunking):
-            st.error("Failed to create ICDR FAISS index. Please check the errors above.")
-            st.stop()
-        print("ICDR FAISS index created.")
+    # Initialize Google API key from Streamlit secrets
+    google_api_key = st.secrets["GOOGLE_API_KEY"]
     
     run_chatbot()

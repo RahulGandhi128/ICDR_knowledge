@@ -101,9 +101,9 @@ def display_logo():
 # Set Google API key
 google_api_key = "AIzaSyCcUFY04YwiLbCdYFvjXzWg-ze0LOtYKmY"
 
-# Add after the Google API key definition
-FAISS_INDEX_NAME = "faiss_index_icdr"
-FAISS_INDEX_PATH = os.path.join(r"C:\Users\Asus\OneDrive\Desktop\New_berry\programs\python\rag", FAISS_INDEX_NAME)
+# Remove local FAISS path
+# FAISS_INDEX_NAME = "faiss_index_icdr"
+# FAISS_INDEX_PATH = os.path.join(r"C:\Users\Asus\OneDrive\Desktop\New_berry\programs\python\rag", FAISS_INDEX_NAME)
 
 # Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_file):
@@ -135,53 +135,52 @@ def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
     else:
         return [text] # If chunking disabled, treat the whole text as a single chunk
 
+# Commenting out the local vector store update function
+# def update_vector_store(text_chunks):
+#     try:
+#         embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
+#
+#         # Load existing ICDR-specific FAISS DB if available, otherwise create a new one
+#         if os.path.exists(FAISS_INDEX_PATH):
+#             vector_store = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
+#             vector_store.add_texts(text_chunks)  # Add new data to existing FAISS index
+#         else:
+#             vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
+#
+#         vector_store.save_local(FAISS_INDEX_PATH)  # Save updated FAISS index
+#         return True
+#     except ImportError:
+#         st.error("FAISS library not found. Please install it using: pip install faiss-cpu")
+#         return False
+#     except Exception as e:
+#         st.error(f"Error creating vector store: {str(e)}")
+#         return False
 
-# Function to store documents permanently in FAISS
-def update_vector_store(text_chunks):
-    try:
-        embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-
-        # Load existing ICDR-specific FAISS DB if available, otherwise create a new one
-        if os.path.exists(FAISS_INDEX_PATH):
-            vector_store = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
-            vector_store.add_texts(text_chunks)  # Add new data to existing FAISS index
-        else:
-            vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
-
-        vector_store.save_local(FAISS_INDEX_PATH)  # Save updated FAISS index
-        return True
-    except ImportError:
-        st.error("FAISS library not found. Please install it using: pip install faiss-cpu")
-        return False
-    except Exception as e:
-        st.error(f"Error creating vector store: {str(e)}")
-        return False
-
-#Function to load documents into FAISS permanently
-def load_documents(chunk_document=True): # Added chunk_document parameter to control chunking
-    all_text = ""
-
-    # GitHub URL for the PDF
-    pdf_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/1717132711878.pdf"
-
-    try:
-        pdf_file = download_file_from_github(pdf_url, "1717132711878.pdf")
-        pdf_text = extract_text_from_pdf(pdf_file)
-        all_text += pdf_text
-        print(f"Text extracted from PDF, length: {len(all_text)}")
-    except Exception as e:
-        print(f"Error processing PDF from GitHub: {e}")
-        return False
-
-    # Process and store documents in FAISS
-    if chunk_document:
-        text_chunks = get_text_chunks(all_text, chunking_enabled=True)
-        print(f"Text chunking ENABLED. Number of text chunks created: {len(text_chunks)}")
-    else:
-        text_chunks = get_text_chunks(all_text, chunking_enabled=False)
-        print(f"Text chunking DISABLED. Treating document as single chunk.")
-
-    return update_vector_store(text_chunks)
+# Commenting out the document loading function that triggers local vector store creation
+# def load_documents(chunk_document=True): # Added chunk_document parameter to control chunking
+#     all_text = ""
+#
+#     # GitHub URL for the PDF
+#     pdf_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/1717132711878.pdf"
+#
+#     try:
+#         pdf_file = download_file_from_github(pdf_url, "1717132711878.pdf")
+#         pdf_text = extract_text_from_pdf(pdf_file)
+#         all_text += pdf_text
+#         print(f"Text extracted from PDF, length: {len(all_text)}")
+#     except Exception as e:
+#         print(f"Error processing PDF from GitHub: {e}")
+#         return False
+#
+#     # Process and store documents in FAISS
+#     if chunk_document:
+#         text_chunks = get_text_chunks(all_text, chunking_enabled=True)
+#         print(f"Text chunking ENABLED. Number of text chunks created: {len(text_chunks)}")
+#     else:
+#         text_chunks = get_text_chunks(all_text, chunking_enabled=False)
+#         print(f"Text chunking DISABLED. Treating document as single chunk.")
+#
+#     return update_vector_store(text_chunks)
 
 
 # Compliance check function
@@ -238,7 +237,7 @@ def check_compliance(user_submission):
         return {"output_text": f"Error processing query: {str(e)}"}, []
 
 # Run this once to store compliance documents permanently (Only run this once initially, or when you update documents)
-# load_documents()  # Commented out after initial loading. Uncomment to reload documents if needed.
+# load_documents()  # Commented out for cloud deployment
 
 def download_file_from_github(url, local_filename):
     """Download a file from GitHub raw content URL"""
@@ -255,7 +254,7 @@ def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
     repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/" # Adjust if files are in a subfolder
-    faiss_file_name = "index.faiss" # Assuming your main FAISS index file is named this (based on FAISS_INDEX_NAME)
+    faiss_file_name = "index.faiss" # Using the requested filename
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:

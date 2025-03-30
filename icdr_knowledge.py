@@ -183,7 +183,7 @@ def check_compliance(user_submission):
 def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/"
+    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/tree/main/faiss_index_icdr"
     faiss_file_name = "index.faiss"
 
     try:

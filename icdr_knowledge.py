@@ -80,23 +80,18 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/image001.png" # Replace with your actual raw URL
+    logo_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/image001.png"  # Fixed URL
 
     col1, col2 = st.columns([1, 4])
     with col1:
         try:
-            response = requests.get(logo_url)
-            response.raise_for_status() # Raise an exception for bad status codes
-            image = Image.open(BytesIO(response.content))
-            st.image(image, use_container_width=True)
+            response = requests.get(logo_url, stream=True)
+            response.raise_for_status()
+            image = Image.open(response.raw)  # Use response.raw to directly read image
+            st.image(image, use_column_width=True)
         except requests.exceptions.RequestException as e:
-            st.warning(f"Error loading company logo from URL: {e}")
-        except Exception as e:
-            st.warning(f"Error opening image: {e}")
+            st.warning(f"Error loading company logo: {e}")
 
-    with col2:
-        st.title("ICDR Regulations Assistant")
-        st.write("Ask questions about ICDR regulations and procedures.")
 
 # Set Google API key
 google_api_key = "AIzaSyCcUFY04YwiLbCdYFvjXzWg-ze0LOtYKmY"
@@ -183,34 +178,28 @@ def check_compliance(user_submission):
 def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-    
-    # Base URL for raw GitHub content
-    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.faiss"
-    
-    faiss_file_name = "index.faiss"
-    pkl_file_name = "index.pkl"
+
+    faiss_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.faiss"
+    pkl_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.pkl"
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Define local paths
-            local_faiss_path = os.path.join(tmpdir, faiss_file_name)
-            local_pkl_path = os.path.join(tmpdir, pkl_file_name)
+            local_faiss_path = os.path.join(tmpdir, "index.faiss")
+            local_pkl_path = os.path.join(tmpdir, "index.pkl")
 
-            # Download the FAISS file
-            faiss_url = repo_base_url + faiss_file_name
-            response = requests.get(faiss_url)
-            response.raise_for_status()  # Raise exception for bad responses
-            with open(local_faiss_path, 'wb') as f:
-                f.write(response.content)
+            # Download FAISS index
+            with requests.get(faiss_url, stream=True) as response:
+                response.raise_for_status()
+                with open(local_faiss_path, 'wb') as f:
+                    shutil.copyfileobj(response.raw, f)
 
-            # Download the PKL file
-            pkl_url = repo_base_url + pkl_file_name
-            response = requests.get(pkl_url)
-            response.raise_for_status()  # Raise exception for bad responses
-            with open(local_pkl_path, 'wb') as f:
-                f.write(response.content)
+            # Download Pickle file
+            with requests.get(pkl_url, stream=True) as response:
+                response.raise_for_status()
+                with open(local_pkl_path, 'wb') as f:
+                    shutil.copyfileobj(response.raw, f)
 
-            # Load the FAISS index
+            # Load FAISS
             vector_store = FAISS.load_local(tmpdir, embeddings, index_name="index")
             return vector_store
 

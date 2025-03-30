@@ -78,7 +78,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_path = r"C:\Users\Asus\OneDrive\Desktop\New_berry\image001.png"
+    logo_path = r""
     
     col1, col2 = st.columns([1, 4])
     with col1:

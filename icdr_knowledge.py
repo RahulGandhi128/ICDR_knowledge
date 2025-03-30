@@ -78,7 +78,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_path = r""
+    logo_path = r"https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/image001.png"
     
     col1, col2 = st.columns([1, 4])
     with col1:

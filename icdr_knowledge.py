@@ -80,7 +80,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/image001.png" # Replace with your actual raw URL
+    logo_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/image001.png" # Replace with your actual raw URL
 
     col1, col2 = st.columns([1, 4])
     with col1:

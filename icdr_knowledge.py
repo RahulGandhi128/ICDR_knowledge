@@ -80,7 +80,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/image001.png" # Replace with your actual raw URL
+    logo_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/image001.png" # Replace with your actual raw URL
 
     col1, col2 = st.columns([1, 4])
     with col1:
@@ -180,16 +180,37 @@ def check_compliance(user_submission):
 # Run this once to store compliance documents permanently (Only run this once initially, or when you update documents)
 # load_documents()  # Commented out for cloud deployment
 
-def download_file_from_github(url, local_filename):
-    """Download a file from GitHub raw content URL"""
-    # Convert GitHub blob URL to raw content URL
-    raw_url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
+def load_vector_store_from_github():
+    """Load FAISS vector store from GitHub"""
+    embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
+    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/"
+    faiss_file_name = "index.faiss"
 
-    response = requests.get(raw_url)
-    if response.status_code == 200:
-        return BytesIO(response.content)
-    else:
-        raise Exception(f"Failed to download file from {url}")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local_faiss_path = os.path.join(tmpdir, faiss_file_name)
+            faiss_url = repo_base_url + faiss_file_name
+
+            # Debugging: Check if the FAISS file exists
+            check_response = requests.head(faiss_url)
+            if check_response.status_code != 200:
+                st.error(f"FAISS file not found at {faiss_url}")
+                return None
+
+            response = requests.get(faiss_url)
+            response.raise_for_status()  # Raise an exception for bad responses
+            with open(local_faiss_path, 'wb') as f:
+                f.write(response.content)
+
+            # Load FAISS
+            vector_store = FAISS.load_local(tmpdir, embeddings)
+            return vector_store
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error downloading FAISS vector store: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Error loading FAISS vector store: {e}")
+        return None
 
 def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""

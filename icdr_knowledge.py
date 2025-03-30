@@ -183,28 +183,37 @@ def check_compliance(user_submission):
 def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/tree/main/faiss_index_icdr"
+    
+    # Base URL for raw GitHub content
+    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/"
+    
     faiss_file_name = "index.faiss"
+    pkl_file_name = "index.pkl"
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Define local paths
             local_faiss_path = os.path.join(tmpdir, faiss_file_name)
+            local_pkl_path = os.path.join(tmpdir, pkl_file_name)
+
+            # Download the FAISS file
             faiss_url = repo_base_url + faiss_file_name
-
-            # Debugging: Check if the FAISS file exists
-            check_response = requests.head(faiss_url)
-            if check_response.status_code != 200:
-                st.error(f"FAISS file not found at {faiss_url}")
-                return None
-
             response = requests.get(faiss_url)
-            response.raise_for_status()  # Raise an exception for bad responses
+            response.raise_for_status()  # Raise exception for bad responses
             with open(local_faiss_path, 'wb') as f:
                 f.write(response.content)
 
-            # Load FAISS
-            vector_store = FAISS.load_local(tmpdir, embeddings)
+            # Download the PKL file
+            pkl_url = repo_base_url + pkl_file_name
+            response = requests.get(pkl_url)
+            response.raise_for_status()  # Raise exception for bad responses
+            with open(local_pkl_path, 'wb') as f:
+                f.write(response.content)
+
+            # Load the FAISS index
+            vector_store = FAISS.load_local(tmpdir, embeddings, index_name="index")
             return vector_store
+
     except requests.exceptions.RequestException as e:
         st.error(f"Error downloading FAISS vector store: {e}")
         return None
@@ -212,31 +221,6 @@ def load_vector_store_from_github():
         st.error(f"Error loading FAISS vector store: {e}")
         return None
 
-def load_vector_store_from_github():
-    """Load FAISS vector store from GitHub"""
-    embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/tree/main/faiss_index_icdr" # Adjust if files are in a subfolder
-    faiss_file_name = "index.faiss" # Using the requested filename
-
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            local_faiss_path = os.path.join(tmpdir, faiss_file_name)
-            # Download the .faiss file
-            faiss_url = repo_base_url + faiss_file_name
-            response = requests.get(faiss_url)
-            response.raise_for_status() # Raise an exception for bad status codes
-            with open(local_faiss_path, 'wb') as f:
-                f.write(response.content)
-
-            # Load the FAISS index
-            vector_store = FAISS.load_local(tmpdir, embeddings)
-            return vector_store
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error downloading vector store files: {e}")
-        return None
-    except Exception as e:
-        st.error(f"Error loading vector store from local files: {e}")
-        return None
 
 def run_chatbot():
     display_logo()

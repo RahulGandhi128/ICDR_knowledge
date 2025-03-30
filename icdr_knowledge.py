@@ -8,7 +8,7 @@ import google.generativeai as genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter # Keep import but make chunking optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.Youtubeing import load_qa_chain
+from langchain-community import load_qa_chain
 from io import BytesIO
 import streamlit as st
 from PIL import Image

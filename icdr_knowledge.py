@@ -8,13 +8,15 @@ import google.generativeai as genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter # Keep import but make chunking optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
+from langchain.chains.Youtubeing import load_qa_chain
 from io import BytesIO
 import streamlit as st
 from PIL import Image
 import requests
 from pathlib import Path
 import pickle
+import tempfile
+import shutil
 
 # Add after imports
 # Set wide layout
@@ -24,7 +26,7 @@ st.set_page_config(layout="wide")
 PRIMARY_COLOR = "#C8102E"  # Red from the logo
 SECONDARY_COLOR = "#223A70" # Dark blue from the logo
 BACKGROUND_COLOR = "#FFFFFF" # White background
-TEXT_COLOR = "#000000" # Black text 
+TEXT_COLOR = "#000000" # Black text
 
 # Apply custom theme
 st.markdown(
@@ -78,16 +80,20 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 def display_logo():
-    logo_path = r"https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/image001.png"
-    
+    logo_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/image001.png" # Replace with your actual raw URL
+
     col1, col2 = st.columns([1, 4])
     with col1:
         try:
-            image = Image.open(logo_path)
+            response = requests.get(logo_url)
+            response.raise_for_status() # Raise an exception for bad status codes
+            image = Image.open(BytesIO(response.content))
             st.image(image, use_container_width=True)
-        except FileNotFoundError:
-            st.warning("Company logo not found. Please check the file path.")
-    
+        except requests.exceptions.RequestException as e:
+            st.warning(f"Error loading company logo from URL: {e}")
+        except Exception as e:
+            st.warning(f"Error opening image: {e}")
+
     with col2:
         st.title("ICDR Regulations Assistant")
         st.write("Ask questions about ICDR regulations and procedures.")
@@ -157,7 +163,7 @@ def load_documents(chunk_document=True): # Added chunk_document parameter to con
 
     # GitHub URL for the PDF
     pdf_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/1717132711878.pdf"
-    
+
     try:
         pdf_file = download_file_from_github(pdf_url, "1717132711878.pdf")
         pdf_text = extract_text_from_pdf(pdf_file)
@@ -189,7 +195,7 @@ def get_compliance_chain():
     3. Highlight any relevant deadlines or time limits
     4. Provide accurate interpretations of ICDR rules and guidelines
     5. If information is not covered in the ICDR documents, explicitly state that
-        
+
     Context (ICDR Documentation):\n {context} \n
     User Question:\n {submission} \n
 
@@ -197,8 +203,8 @@ def get_compliance_chain():
     """
 
     model = ChatGoogleGenerativeAI(
-        google_api_key=google_api_key, 
-        model="gemini-2.0-flash-thinking-exp-01-21", 
+        google_api_key=google_api_key,
+        model="gemini-2.0-flash-thinking-exp-01-21",
         temperature=0.1,
         max_output_tokens=10000
     )
@@ -209,7 +215,7 @@ def get_compliance_chain():
 def check_compliance(user_submission):
     try:
         embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
-        
+
         # Load vector store from GitHub
         vector_store = load_vector_store_from_github()
         if vector_store is None:
@@ -217,7 +223,7 @@ def check_compliance(user_submission):
 
         print(f"User Submission for Similarity Search: '{user_submission}'")
         relevant_docs = vector_store.similarity_search(user_submission, k=25)
-        
+
         if not relevant_docs:
             print("No relevant documents found by similarity search!")
         else:
@@ -238,7 +244,7 @@ def download_file_from_github(url, local_filename):
     """Download a file from GitHub raw content URL"""
     # Convert GitHub blob URL to raw content URL
     raw_url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
-    
+
     response = requests.get(raw_url)
     if response.status_code == 200:
         return BytesIO(response.content)
@@ -247,13 +253,28 @@ def download_file_from_github(url, local_filename):
 
 def load_vector_store_from_github():
     """Load FAISS vector store from GitHub"""
-    vector_url = "https://github.com/RahulGandhi128/ICDR_knowledge/blob/main/index.pkl"
+    embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
+    repo_base_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/" # Adjust if files are in a subfolder
+    faiss_file_name = "index.faiss" # Assuming your main FAISS index file is named this (based on FAISS_INDEX_NAME)
+
     try:
-        vector_data = download_file_from_github(vector_url, "index.pkl")
-        with vector_data as f:
-            return pickle.load(f)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local_faiss_path = os.path.join(tmpdir, faiss_file_name)
+            # Download the .faiss file
+            faiss_url = repo_base_url + faiss_file_name
+            response = requests.get(faiss_url)
+            response.raise_for_status() # Raise an exception for bad status codes
+            with open(local_faiss_path, 'wb') as f:
+                f.write(response.content)
+
+            # Load the FAISS index
+            vector_store = FAISS.load_local(tmpdir, embeddings)
+            return vector_store
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error downloading vector store files: {e}")
+        return None
     except Exception as e:
-        st.error(f"Error loading vector store: {str(e)}")
+        st.error(f"Error loading vector store from local files: {e}")
         return None
 
 def run_chatbot():
@@ -267,26 +288,26 @@ def run_chatbot():
                     <div class="chat-message {message['role']}">
                         <b>{message['role'].title()}:</b><br>{message['content']}
                     </div>
-                    """, 
+                    """,
                     unsafe_allow_html=True
                 )
 
     # User input
     user_query = st.text_input("Ask about ICDR regulations:", key="user_input")
-    
+
     if st.button("Submit", key="submit"):
         if user_query:
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": user_query})
-            
+
             # Get AI response
             with st.spinner("Analyzing your query..."):
                 response, _ = check_compliance(user_query)
                 ai_response = response['output_text']
-            
+
             # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": ai_response})
-            
+
             # Clear input using the new rerun method
             st.rerun()
 
@@ -302,8 +323,8 @@ if __name__ == "__main__":
     except ImportError:
         st.error("Please install FAISS first: pip install faiss-cpu")
         st.stop()
-    
+
     # Initialize Google API key from Streamlit secrets
     google_api_key = st.secrets["GOOGLE_API_KEY"]
-    
+
     run_chatbot()

@@ -139,7 +139,7 @@ def get_compliance_chain():
 
     model = ChatGoogleGenerativeAI(
         google_api_key=google_api_key,
-        model="gemini-2.0-flash-thinking-exp-01-21",
+        model="gemini-2.5-pro-exp-03-25",
         temperature=0.1,
         max_output_tokens=10000
     )

@@ -88,7 +88,7 @@ def display_logo():
             response = requests.get(logo_url, stream=True)
             response.raise_for_status()
             image = Image.open(response.raw)  # Use response.raw to directly read image
-            st.image(st.image(image, use_container_width=True))
+            st.image(image, use_container_width=True)
         except requests.exceptions.RequestException as e:
             st.warning(f"Error loading company logo: {e}")
 

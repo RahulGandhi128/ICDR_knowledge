@@ -175,48 +175,37 @@ def check_compliance(user_submission):
 # Run this once to store compliance documents permanently (Only run this once initially, or when you update documents)
 # load_documents()  # Commented out for cloud deployment
 
+import subprocess
+
 def load_vector_store_from_github():
-    """Load FAISS vector store from GitHub"""
+    """Download the FAISS vector store from GitHub and load it."""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
 
-    faiss_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.faiss"
-    pkl_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.pkl"
+    github_repo_url = "https://github.com/RahulGandhi128/ICDR_knowledge.git"
+    repo_name = "ICDR_knowledge"
+    vector_store_folder = "faiss_index_icdr"
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            local_faiss_path = os.path.join(tmpdir, "index.faiss")
-            local_pkl_path = os.path.join(tmpdir, "index.pkl")
+            local_repo_path = os.path.join(tmpdir, repo_name)
 
-            # Download FAISS index
-            faiss_response = requests.get(faiss_url, stream=True)
-            faiss_response.raise_for_status()
-            with open(local_faiss_path, 'wb') as f:
-                shutil.copyfileobj(faiss_response.raw, f)
+            # Clone the repository
+            subprocess.run(["git", "clone", "--depth", "1", github_repo_url, local_repo_path], check=True)
 
-            # Download Pickle metadata
-            pkl_response = requests.get(pkl_url, stream=True)
-            pkl_response.raise_for_status()
-            with open(local_pkl_path, 'wb') as f:
-                shutil.copyfileobj(pkl_response.raw, f)
+            # Path to the FAISS index folder
+            local_vector_store_path = os.path.join(local_repo_path, vector_store_folder)
 
             # Load FAISS index
-            import faiss
-            index = faiss.read_index(local_faiss_path)
-
-            # Load metadata (document mappings)
-            with open(local_pkl_path, "rb") as f:
-                stored_data = pickle.load(f)
-
-            # Reconstruct the FAISS vector store
-            vector_store = FAISS(embedding_function=embeddings, index=index, docstore=stored_data["docstore"], index_to_docstore_id=stored_data["index_to_docstore_id"])
+            vector_store = FAISS.load_local(local_vector_store_path, embeddings, index_name="index")
             return vector_store
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error downloading FAISS vector store: {e}")
+    except subprocess.CalledProcessError as e:
+        st.error(f"Error cloning GitHub repo: {e}")
         return None
     except Exception as e:
         st.error(f"Error loading FAISS vector store: {e}")
         return None
+
 
 
 def run_chatbot():

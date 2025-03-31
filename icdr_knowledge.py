@@ -188,19 +188,27 @@ def load_vector_store_from_github():
             local_pkl_path = os.path.join(tmpdir, "index.pkl")
 
             # Download FAISS index
-            with requests.get(faiss_url, stream=True) as response:
-                response.raise_for_status()
-                with open(local_faiss_path, 'wb') as f:
-                    shutil.copyfileobj(response.raw, f)
+            faiss_response = requests.get(faiss_url, stream=True)
+            faiss_response.raise_for_status()
+            with open(local_faiss_path, 'wb') as f:
+                shutil.copyfileobj(faiss_response.raw, f)
 
-            # Download Pickle file
-            with requests.get(pkl_url, stream=True) as response:
-                response.raise_for_status()
-                with open(local_pkl_path, 'wb') as f:
-                    shutil.copyfileobj(response.raw, f)
+            # Download Pickle metadata
+            pkl_response = requests.get(pkl_url, stream=True)
+            pkl_response.raise_for_status()
+            with open(local_pkl_path, 'wb') as f:
+                shutil.copyfileobj(pkl_response.raw, f)
 
-            # Load FAISS
-            vector_store = FAISS.load_local(tmpdir, embeddings, index_name="index")
+            # Load FAISS index
+            import faiss
+            index = faiss.read_index(local_faiss_path)
+
+            # Load metadata (document mappings)
+            with open(local_pkl_path, "rb") as f:
+                stored_data = pickle.load(f)
+
+            # Reconstruct the FAISS vector store
+            vector_store = FAISS(embedding_function=embeddings, index=index, docstore=stored_data["docstore"], index_to_docstore_id=stored_data["index_to_docstore_id"])
             return vector_store
 
     except requests.exceptions.RequestException as e:

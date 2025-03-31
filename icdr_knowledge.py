@@ -178,35 +178,44 @@ def check_compliance(user_submission):
 import subprocess
 
 def load_vector_store_from_github():
-    """Download the FAISS vector store from GitHub and load it."""
+    """Load FAISS vector store from GitHub"""
     embeddings = GoogleGenerativeAIEmbeddings(google_api_key=google_api_key, model="models/embedding-001")
 
-    github_repo_url = "https://github.com/RahulGandhi128/ICDR_knowledge.git"
-    repo_name = "ICDR_knowledge"
-    vector_store_folder = "faiss_index_icdr"
+    faiss_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.faiss"
+    pkl_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.pkl"
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            local_repo_path = os.path.join(tmpdir, repo_name)
+            local_faiss_path = os.path.join(tmpdir, "index.faiss")
+            local_pkl_path = os.path.join(tmpdir, "index.pkl")
 
-            # Clone the repository
-            subprocess.run(["git", "clone", "--depth", "1", github_repo_url, local_repo_path], check=True)
+            # Download FAISS index
+            with requests.get(faiss_url, stream=True) as response:
+                response.raise_for_status()
+                with open(local_faiss_path, 'wb') as f:
+                    shutil.copyfileobj(response.raw, f)
 
-            # Path to the FAISS index folder
-            local_vector_store_path = os.path.join(local_repo_path, vector_store_folder)
+            # Download Pickle file
+            with requests.get(pkl_url, stream=True) as response:
+                response.raise_for_status()
+                with open(local_pkl_path, 'wb') as f:
+                    shutil.copyfileobj(response.raw, f)
 
-            # Load FAISS index
-            vector_store = FAISS.load_local(local_vector_store_path, embeddings, index_name="index")
+            # Load FAISS with safe deserialization
+            vector_store = FAISS.load_local(
+                tmpdir, 
+                embeddings, 
+                index_name="index",
+                allow_dangerous_deserialization=True  # Allow deserialization safely
+            )
             return vector_store
 
-    except subprocess.CalledProcessError as e:
-        st.error(f"Error cloning GitHub repo: {e}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error downloading FAISS vector store: {e}")
         return None
     except Exception as e:
         st.error(f"Error loading FAISS vector store: {e}")
         return None
-
-
 
 def run_chatbot():
     display_logo()

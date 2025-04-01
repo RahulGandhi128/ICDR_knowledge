@@ -9,3 +9,4 @@ streamlit
 Pillow
 faiss-cpu
 pickle-mixin
+PyMuPDF

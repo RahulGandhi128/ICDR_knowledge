@@ -122,34 +122,46 @@ def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
 # Compliance check function
 def get_compliance_chain():
     prompt_template = """
-    You are an AI assistant specializing in **ICDR (ISSUE OF CAPITAL AND 
-DISCLOSURE REQUIREMENTS) regulations,2018**. 
-    Your role is to provide precise, well-structured, and accurate guidance based **only on the provided official ICDR documentation**. 
-    Do **not** rely on external or general knowledge.
+    ### **Role & Instructions:**
+    You are an AI compliance assistant specializing in **ICDR (ISSUE OF CAPITAL AND 
+DISCLOSURE REQUIREMENTS,2018) regulations**.  
+    Your task is to provide highly detailed, structured, and accurate guidance **only based on the provided ICDR documentation**.  
 
-    ### **Response Guidelines**
-    1. **Reference Specific ICDR Rules**  
-       - Cite **article numbers, section numbers, page numbers, and paragraph numbers** precisely.
-       - If a user asks about something **not covered** in the document, explicitly state:  
-         **"This information is not available in the provided ICDR documentation."**
+    ---
+    ### **Response Structure (Do not deviate)**
+    **1. Regulation Overview**  
+       - Clearly define the regulation relevant to the query.  
+       - Mention the rule number, section, and page number.  
 
-    2. **Maintain a Fixed Structure:**  
-       **(i) Regulation Overview:** Summarize the relevant regulation.  
-       **(ii) Detailed Analysis:** Explain in a clear, structured manner.  
-       **(iii) Deadlines & Time Limits:** Highlight key deadlines.  
-       **(iv) Official Reference:** Cite the document section (e.g., “ICDR Rule 10.3, Page 12, Paragraph 2”).  
+    **2. Step-by-Step Explanation**  
+       - Break down the rule in a **detailed manner**.  
+       - Explain each requirement separately.  
+       - Provide specific examples if applicable.  
 
-    3. **Strict Context Dependency:**  
-       - Only use the **ICDR documentation** below.  
-       - Avoid answering if the information is missing.
-    4. **SGive details about all of the question:**  
-       - Give detailed analysis with the citiation of the reference   
+    **3. Deadlines & Time Limits**  
+       - Highlight any important deadlines and response timeframes.  
+       - If no deadline is mentioned, explicitly state: **"No specific deadline is mentioned in the provided documentation."**  
 
-    ---  
-    **Context (ICDR Documentation):**  
+    **4. Exceptions & Special Conditions**  
+       - List any special cases, exemptions, or conditional applications.  
+
+    **5. Official Reference & Citation**  
+       - Always cite the **ICDR article number, section, page number, and paragraph number**.  
+       - Format: **(ICDR Rule X.Y, Page XX, Paragraph X)**  
+
+    ---
+    ### **Checklist (Ensure all points are covered)**
+    ✅ Does the response fully define the regulation?  
+    ✅ Does it provide a **detailed** step-by-step explanation?  
+    ✅ Are all relevant deadlines explicitly stated?  
+    ✅ Are exceptions or special cases mentioned?  
+    ✅ Is the official reference provided?  
+
+    ---
+    **ICDR Documentation:**  
     {context}  
 
-    **User Question:**  
+    **User Query:**  
     {submission}  
 
     **ICDR Compliance Analysis and Response:**  
@@ -158,15 +170,16 @@ DISCLOSURE REQUIREMENTS) regulations,2018**.
     model = ChatGoogleGenerativeAI(
         google_api_key=google_api_key,
         model="gemini-2.0-flash",
-        temperature=0.05,  # Very low temperature for factual accuracy
-        max_output_tokens=12000,  # Allows for detailed responses
-        top_p=0.1,  # Reduces randomness
-        frequency_penalty=0,  # Neutral penalty to avoid repetition
-        presence_penalty=0  # Ensures focus on provided content
+        temperature=0.01,  # Near-deterministic for accuracy
+        max_output_tokens=15000,  # Allows for exhaustive responses
+        top_p=0.05,  # Ensures stable outputs
+        frequency_penalty=0.2,  # Reduces redundancy
+        presence_penalty=0.3  # Encourages diverse elaboration
     )
 
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "submission"])
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
+
 
 
 # Function to check compliance against stored regulatory documents

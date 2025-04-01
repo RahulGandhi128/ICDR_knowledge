@@ -19,7 +19,7 @@ from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter # Keep import
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.Youtubeing import load_qa_chain
+from langchain.chains.question_answering import load_qa_chain
 import google.generativeai as genai # Keep genai import if needed elsewhere
 
 # --- Configuration ---

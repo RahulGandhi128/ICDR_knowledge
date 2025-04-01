@@ -119,67 +119,34 @@ def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
         return [text] # If chunking disabled, treat the whole text as a single chunk
 
 
-# Compliance check function
 def get_compliance_chain():
     prompt_template = """
-    ### **Role & Instructions:**
-    You are an AI compliance assistant specializing in **ICDR (ISSUE OF CAPITAL AND 
-DISCLOSURE REQUIREMENTS,2018) regulations**.  
-    Your task is to provide highly detailed, structured, and accurate guidance **only based on the provided ICDR documentation**.  
+    You are an expert AI assistant specializing in ICDR (International Centre for Dispute Resolution) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
 
-    ---
-    ### **Response Structure (Do not deviate)**
-    **1. Regulation Overview**  
-       - Clearly define the regulation relevant to the query.  
-       - Mention the rule number, section, and page number.  
+    When analyzing queries, please:
+    1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs.
+    2. Explain procedures and requirements clearly
+    3. Highlight any relevant deadlines or time limits
+    4. Provide accurate interpretations of ICDR rules and guidelines
+    5. If information is not covered in the ICDR documents, explicitly state that
 
-    **2. Step-by-Step Explanation**  
-       - Break down the rule in a **detailed manner**.  
-       - Explain each requirement separately.  
-       - Provide specific examples if applicable.  
+    Context (ICDR Documentation):\n {context} \n
+    User Question:\n {submission} \n
 
-    **3. Deadlines & Time Limits**  
-       - Highlight any important deadlines and response timeframes.  
-       - If no deadline is mentioned, explicitly state: **"No specific deadline is mentioned in the provided documentation."**  
-
-    **4. Exceptions & Special Conditions**  
-       - List any special cases, exemptions, or conditional applications.  
-
-    **5. Official Reference & Citation**  
-       - Always cite the **ICDR article number, section, page number, and paragraph number**.  
-       - Format: **(ICDR Rule X.Y, Page XX, Paragraph X)**  
-
-    ---
-    ### **Checklist (Ensure all points are covered)**
-    ✅ Does the response fully define the regulation?  
-    ✅ Does it provide a **detailed** step-by-step explanation?  
-    ✅ Are all relevant deadlines explicitly stated?  
-    ✅ Are exceptions or special cases mentioned?  
-    ✅ Is the official reference provided?  
-
-    ---
-    **ICDR Documentation:**  
-    {context}  
-
-    **User Query:**  
-    {submission}  
-
-    **ICDR Compliance Analysis and Response:**  
+    ICDR Analysis and Response:
     """
 
     model = ChatGoogleGenerativeAI(
         google_api_key=google_api_key,
-        model="gemini-2.0-flash",
-        temperature=0.01,  # Near-deterministic for accuracy
-        max_output_tokens=15000,  # Allows for exhaustive responses
+        model="gemini-2.0-flash    ",
+        temperature=0.1,
+        max_output_tokens=10000
         top_p=0.05,  # Ensures stable outputs
         frequency_penalty=0.2,  # Reduces redundancy
-        presence_penalty=0.3  # Encourages diverse elaboration
+        presence_penalty=0.3 
     )
-
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "submission"])
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
-
 
 
 # Function to check compliance against stored regulatory documents

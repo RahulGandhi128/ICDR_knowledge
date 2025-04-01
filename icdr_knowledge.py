@@ -435,7 +435,7 @@ def get_compliance_chain():
         model = ChatGoogleGenerativeAI(
             google_api_key=google_api_key,
             # model="gemini-pro", # Use a standard, generally available model
-            model="gemini-1.5-flash-latest", # Or use the latest flash model if available
+            model="gemini-2.0-flash-thinking-exp-01-21", # Or use the latest flash model if available
             temperature=0.1, # Low temperature for factual recall
             # max_output_tokens=8192, # Adjust based on model limits if needed
             top_p=0.9, # Slightly higher top_p can sometimes help with fluency

@@ -122,29 +122,50 @@ def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
 # Compliance check function
 def get_compliance_chain():
     prompt_template = """
-    You are an expert AI assistant specializing in ICDR (International Centre for Dispute Resolution) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
+    You are an AI assistant specializing in **ICDR (ISSUE OF CAPITAL AND 
+DISCLOSURE REQUIREMENTS) regulations,2018**. 
+    Your role is to provide precise, well-structured, and accurate guidance based **only on the provided official ICDR documentation**. 
+    Do **not** rely on external or general knowledge.
 
-    When analyzing queries, please:
-    1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs.
-    2. Explain procedures and requirements clearly
-    3. Highlight any relevant deadlines or time limits
-    4. Provide accurate interpretations of ICDR rules and guidelines
-    5. If information is not covered in the ICDR documents, explicitly state that
+    ### **Response Guidelines**
+    1. **Reference Specific ICDR Rules**  
+       - Cite **article numbers, section numbers, page numbers, and paragraph numbers** precisely.
+       - If a user asks about something **not covered** in the document, explicitly state:  
+         **"This information is not available in the provided ICDR documentation."**
 
-    Context (ICDR Documentation):\n {context} \n
-    User Question:\n {submission} \n
+    2. **Maintain a Fixed Structure:**  
+       **(i) Regulation Overview:** Summarize the relevant regulation.  
+       **(ii) Detailed Analysis:** Explain in a clear, structured manner.  
+       **(iii) Deadlines & Time Limits:** Highlight key deadlines.  
+       **(iv) Official Reference:** Cite the document section (e.g., “ICDR Rule 10.3, Page 12, Paragraph 2”).  
 
-    ICDR Analysis and Response:
+    3. **Strict Context Dependency:**  
+       - Only use the **ICDR documentation** below.  
+       - Avoid answering if the information is missing.  
+
+    ---  
+    **Context (ICDR Documentation):**  
+    {context}  
+
+    **User Question:**  
+    {submission}  
+
+    **ICDR Compliance Analysis and Response:**  
     """
 
     model = ChatGoogleGenerativeAI(
         google_api_key=google_api_key,
-        model="gemini-2.5-pro-exp-03-25",
-        temperature=0.1,
-        max_output_tokens=10000
+        model="gemini-2.0-flash",
+        temperature=0.05,  # Very low temperature for factual accuracy
+        max_output_tokens=12000,  # Allows for detailed responses
+        top_p=0.1,  # Reduces randomness
+        frequency_penalty=0,  # Neutral penalty to avoid repetition
+        presence_penalty=0  # Ensures focus on provided content
     )
+
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "submission"])
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
+
 
 # Function to check compliance against stored regulatory documents
 def check_compliance(user_submission):

@@ -121,7 +121,7 @@ def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
 
 def get_compliance_chain():
     prompt_template = """
-    You are an expert AI assistant specializing in ICDR (International Centre for Dispute Resolution) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
+    You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
 
     When analyzing queries, please:
     1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs.
@@ -138,7 +138,7 @@ def get_compliance_chain():
 
     model = ChatGoogleGenerativeAI(
         google_api_key=google_api_key,
-        model="gemini-2.0-flash",
+        model="gemini-2.0-flash-thinking-exp-01-21",
         temperature=0.1,
         max_output_tokens=10000,
         top_p=0.05,  # Ensures stable outputs

@@ -207,6 +207,7 @@ def get_text_chunks(text, chunking_enabled=True, pdf_path=None):
     else:
         return [text]
 
+
 def get_compliance_chain():
     prompt_template = """
     You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
@@ -235,7 +236,6 @@ def get_compliance_chain():
     )
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "submission"])
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
-
 
 # Function to check compliance against stored regulatory documents
 def check_compliance(user_submission):

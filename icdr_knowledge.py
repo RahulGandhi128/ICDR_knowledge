@@ -141,7 +141,9 @@ DISCLOSURE REQUIREMENTS) regulations,2018**.
 
     3. **Strict Context Dependency:**  
        - Only use the **ICDR documentation** below.  
-       - Avoid answering if the information is missing.  
+       - Avoid answering if the information is missing.
+    4. **SGive details about all of the question:**  
+       - Give detailed analysis with the citiation of the reference   
 
     ---  
     **Context (ICDR Documentation):**  

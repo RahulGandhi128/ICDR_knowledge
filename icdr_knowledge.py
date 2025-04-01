@@ -140,7 +140,7 @@ def get_compliance_chain():
         google_api_key=google_api_key,
         model="gemini-2.0-flash    ",
         temperature=0.1,
-        max_output_tokens=10000
+        max_output_tokens=10000,
         top_p=0.05,  # Ensures stable outputs
         frequency_penalty=0.2,  # Reduces redundancy
         presence_penalty=0.3 

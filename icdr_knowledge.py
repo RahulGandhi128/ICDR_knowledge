@@ -5,7 +5,7 @@ from PyPDF2 import PdfReader
 import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
-from langchain.text_splitter import RecursiveCharacterTextSplitter # Keep import but make chunking optional
+from langchain.text_splitter import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
@@ -110,14 +110,102 @@ def extract_text_from_pdf(pdf_file):
             all_text += text.encode('ascii', 'ignore').decode('ascii') + "\n"
     return all_text
 
-# Function to split text into smaller chunks (now optional - set large chunk size to effectively disable)
-def get_text_chunks(text, chunking_enabled=True): # Added chunking_enabled flag
-    if chunking_enabled:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100) # Large chunk size to minimize splitting
-        return text_splitter.split_text(text)
-    else:
-        return [text] # If chunking disabled, treat the whole text as a single chunk
+def extract_headings(pdf_path):
+    doc = fitz.open(pdf_path)
+    headings = []
 
+    for page_num, page in enumerate(doc):
+        blocks = page.get_text("blocks")
+        for block in blocks:
+            text = block[4].strip()
+
+            # Identify potential headings using patterns
+            if re.match(r"^\d+(\.\d+)*\s+[A-Za-z]+", text):
+                headings.append((text, page_num))
+            elif text.isupper():
+                headings.append((text, page_num))
+
+    return headings
+
+def get_text_chunks_with_metadata(pdf_path, chunk_size=2000, chunk_overlap=200):
+    doc = fitz.open(pdf_path)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n"],
+        length_function=len
+    )
+
+    all_chunks = []
+    headings = extract_headings(pdf_path)
+    current_section = "General"
+
+    for page_num, page in enumerate(doc):
+        text = page.get_text("text").strip()
+        split_texts = text_splitter.split_text(text)
+
+        for split_text in split_texts:
+            # Find the closest heading for the chunk
+            for heading, heading_page in reversed(headings):
+                if heading_page <= page_num:
+                    current_section = heading
+                    break
+
+            # Create chunk with metadata
+            chunk = {
+                "text": split_text,
+                "metadata": {
+                    "source": "ICDR_documentation",
+                    "section": current_section,
+                    "page": page_num + 1
+                }
+            }
+            all_chunks.append(chunk)
+
+    return all_chunks
+
+def get_text_chunks(text, chunking_enabled=True, pdf_path=None):
+    if chunking_enabled:
+        if pdf_path:
+            # Use the new metadata-aware chunking for PDFs
+            chunks = get_text_chunks_with_metadata(pdf_path)
+            
+            # Debug output
+            print("\n--- DEBUG: Generated Chunks with Section Metadata ---")
+            for i, chunk in enumerate(chunks[:5]):
+                print(f"Chunk {i+1}: {chunk['text'][:200]}...")
+                print(f"Metadata: {chunk['metadata']}\n")
+            print(f"Total chunks created: {len(chunks)}")
+            
+            # Create a new text splitter instance for document creation
+            doc_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=2000,
+                chunk_overlap=200,
+                separators=["\n\n", "\n", " "],
+                length_function=len
+            )
+            
+            # Convert to Document objects
+            documents = doc_splitter.create_documents(
+                texts=[chunk["text"] for chunk in chunks],
+                metadatas=[chunk["metadata"] for chunk in chunks]
+            )
+            print(f"Successfully created {len(documents)} document objects")
+            return documents
+        else:
+            # Fallback to basic chunking for non-PDF text
+            basic_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=2000,
+                chunk_overlap=200,
+                separators=["\n\n", "\n", " "],
+                length_function=len
+            )
+            return basic_splitter.create_documents(
+                texts=[text],
+                metadatas=[{"source": "ICDR_documentation", "section": "General"}]
+            )
+    else:
+        return [text]
 
 def get_compliance_chain():
     prompt_template = """

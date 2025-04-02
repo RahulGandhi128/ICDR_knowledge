@@ -422,12 +422,15 @@ def load_vector_store_from_github():
 # --- QA Chain Setup (Modified for Conversation) ---
 
 # --- Add PromptTemplate import ---
-from langchain.prompts import PromptTemplate # Make sure this is imported
+from langchain.prompts import PromptTemplate
 
-# --- QA Chain Setup (Corrected for Conversation) ---
+# --- Import default condense prompt for reference if needed ---
+# from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
+
+# --- QA Chain Setup (Corrected & Tuned for Better Retrieval) ---
 
 def get_conversational_compliance_chain(vector_store, memory):
-    """Creates a ConversationalRetrievalChain with a prompt compatible with history and standard inputs."""
+    """Creates a ConversationalRetrievalChain tuned for better context handling."""
     global google_api_key
     if not google_api_key:
         st.error("Google API Key not configured. Cannot initialize QA model.")
@@ -439,8 +442,8 @@ def get_conversational_compliance_chain(vector_store, memory):
          st.error("Memory object not available. Cannot create chain.")
          return None
 
-    # --- Define the CORRECTED Prompt Template ---
-    # This version uses {question} (provided by the chain) and includes {chat_history}
+    # --- Define the CORRECTED Prompt Template for Answer Generation ---
+    # (This is the same as the previous fix)
     corrected_prompt_template = """
     You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context and the ongoing conversation history.
 
@@ -462,26 +465,43 @@ def get_conversational_compliance_chain(vector_store, memory):
 
     ICDR Analysis and Response:
     """
-    # --- Create PromptTemplate object with CORRECT input variables ---
-    CORRECTED_PROMPT = PromptTemplate(
+    ANSWER_PROMPT = PromptTemplate(
         template=corrected_prompt_template, input_variables=["chat_history", "context", "question"]
     )
     # --- ---
 
-    # Define the LLM
+    # --- Define a Custom Prompt for Question Condensing ---
+    # This prompt tries to prioritize the follow-up question more explicitly
+    _template = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, in its original language.
+    If the follow up question is a new topic, unrelated to the chat history, the standalone question should be essentially the same as the follow up question.
+    If the follow up question references the chat history, combine the relevant context from the history with the follow up question into a clear, self-contained question.
+
+    Chat History:
+    {chat_history}
+
+    Follow Up Input: {question}
+    Standalone question:"""
+    CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(_template)
+    # --- ---
+
+
+    # Define the LLM (use the same LLM for both steps for consistency)
     try:
         llm = ChatGoogleGenerativeAI(
             google_api_key=google_api_key,
             model="gemini-1.5-flash-latest",
-            temperature=0.1,
+            temperature=0.1, # Keep temperature low for factual tasks
             top_p=0.9,
         )
     except Exception as e:
         st.error(f"Failed to initialize Google Chat Model: {e}")
         return None
 
-    # Define the retriever
-    retriever = vector_store.as_retriever(search_kwargs={'k': 10}) # Adjust k if needed
+    # Define the retriever (Consider tuning search_kwargs)
+    retriever = vector_store.as_retriever(
+        search_type="similarity", # Or try "mmr" (Max Marginal Relevance) for diversity
+        search_kwargs={'k': 7} # Retrieve slightly fewer docs, potentially more focused
+    )
 
     # Create the Conversational Retrieval Chain
     try:
@@ -489,21 +509,22 @@ def get_conversational_compliance_chain(vector_store, memory):
             llm=llm,
             retriever=retriever,
             memory=memory,
-            # --- Inject the CORRECTED prompt ---
-            combine_docs_chain_kwargs={"prompt": CORRECTED_PROMPT},
-            # --- ---
+            condense_question_prompt=CONDENSE_QUESTION_PROMPT, # <-- Use the custom condense prompt
+            combine_docs_chain_kwargs={"prompt": ANSWER_PROMPT}, # <-- Use the corrected answer prompt
             return_source_documents=True,
             output_key='answer',
-            # verbose=True # Keep for debugging if needed initially
+            verbose=False # Set to True temporarily in your local environment to debug steps
         )
-        print("ConversationalRetrievalChain created with corrected prompt.")
-        # Removed the previous warning as the prompt is now compatible
+        print("ConversationalRetrievalChain created with custom condense_question_prompt.")
         return conversation_chain
 
     except Exception as e:
          st.error(f"Error creating ConversationalRetrievalChain: {e}")
-         print(f"Chain creation error: {e}")
+         import traceback
+         print(f"Chain creation error traceback:\n{traceback.format_exc()}") # Print full traceback
          return None
+
+
 # --- Core Compliance Check ---
 
 # --- Core Compliance Check (Modified for Conversation) ---

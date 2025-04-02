@@ -453,6 +453,7 @@ def get_conversational_compliance_chain(vector_store, memory):
     3. Highlight any relevant deadlines or time limits mentioned.
     4. Provide accurate interpretations of ICDR rules and guidelines based *only* on the provided context and chat history.
     5. If information is not covered in the documents or conversation, explicitly state that.
+    6. Respond concisely, then ask specific follow-up questions if required to clarify ambiguities realted to details from related sections or cross-references, emphasizing that more context yields a better answer.
 
     Chat History:
     {chat_history}

@@ -489,7 +489,7 @@ def get_conversational_compliance_chain(vector_store, memory):
     try:
         llm = ChatGoogleGenerativeAI(
             google_api_key=google_api_key,
-            model="gemini-1.5-flash-latest",
+            model="gemini-2.0-flash-thinking-exp-01-21",
             temperature=0.1, # Keep temperature low for factual tasks
             top_p=0.9,
         )
@@ -500,7 +500,7 @@ def get_conversational_compliance_chain(vector_store, memory):
     # Define the retriever (Consider tuning search_kwargs)
     retriever = vector_store.as_retriever(
         search_type="similarity", # Or try "mmr" (Max Marginal Relevance) for diversity
-        search_kwargs={'k': 7} # Retrieve slightly fewer docs, potentially more focused
+        search_kwargs={'k': 10} # Retrieve slightly fewer docs, potentially more focused
     )
 
     # Create the Conversational Retrieval Chain

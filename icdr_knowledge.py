@@ -1,3 +1,8 @@
+# --- Langchain & Google AI Imports ---
+# ... (keep existing imports)
+from langchain.memory import ConversationBufferMemory # <-- Add Memory
+from langchain.chains import ConversationalRetrievalChain # <-- Add Conversational Chain
+
 # --- Core Imports ---
 import streamlit as st
 import os
@@ -82,6 +87,13 @@ st.markdown(
 # --- Session State ---
 if 'messages' not in st.session_state:
     st.session_state.messages = []
+# Initialize conversation memory
+if 'memory' not in st.session_state:
+    # return_messages=True ensures the history is stored as ChatMessage objects
+    # memory_key='chat_history' links this memory to the prompt variable
+    st.session_state.memory = ConversationBufferMemory(
+        memory_key='chat_history', return_messages=True, output_key='answer'
+    )
 
 # --- Global Variables (from Secrets) ---
 # Moved API key retrieval to main block for clarity
@@ -407,119 +419,161 @@ def load_vector_store_from_github():
 
 # --- QA Chain Setup ---
 
-def get_compliance_chain():
-    """Creates the Langchain QA chain with the specified model and prompt."""
-    global google_api_key # Ensure API key is accessible
+# --- QA Chain Setup (Modified for Conversation) ---
+
+# --- Add PromptTemplate import ---
+from langchain.prompts import PromptTemplate # Make sure this is imported
+
+# --- QA Chain Setup (Modified for Conversation with Specific Prompt Attempt) ---
+
+def get_conversational_compliance_chain(vector_store, memory):
+    """Creates a ConversationalRetrievalChain attempting to use a specific prompt."""
+    global google_api_key
     if not google_api_key:
         st.error("Google API Key not configured. Cannot initialize QA model.")
         return None
+    if vector_store is None:
+         st.error("Vector store not available. Cannot create chain.")
+         return None
+    if memory is None:
+         st.error("Memory object not available. Cannot create chain.")
+         return None
 
-    prompt_template = """
+    # --- Define the User's Exact Prompt ---
+    # WARNING: This prompt lacks {chat_history} and uses {submission} instead of {question}
+    # This will likely limit conversational ability and may cause errors.
+    user_prompt_template = """
     You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
 
-    When analyzing queries, please:
     When analyzing queries, please:
     1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs.
     2. Explain procedures and requirements clearly
     3. Highlight any relevant deadlines or time limits
     4. Provide accurate interpretations of ICDR rules and guidelines
-    5. If information is not covered in the ICDR documents, explicitly state that.
+    5. If information is not covered in the ICDR documents, explicitly state that
 
     Context (ICDR Documentation):\n {context} \n
     User Question:\n {submission} \n
 
     ICDR Analysis and Response:
     """
+    # --- Create PromptTemplate object ---
+    # Note: Input variables MUST match the prompt string.
+    CUSTOM_PROMPT = PromptTemplate(
+        template=user_prompt_template, input_variables=["context", "submission"]
+    )
+    # --- ---
 
+    # Define the LLM
     try:
-        model = ChatGoogleGenerativeAI(
+        llm = ChatGoogleGenerativeAI(
             google_api_key=google_api_key,
-            # model="gemini-pro", # Use a standard, generally available model
-            model="gemini-2.0-flash-thinking-exp-01-21", # Or use the latest flash model if available
-            temperature=0.1, # Low temperature for factual recall
-            # max_output_tokens=8192, # Adjust based on model limits if needed
-            top_p=0.9, # Slightly higher top_p can sometimes help with fluency
-            # frequency_penalty=0.1, # Gentle penalty
-            # presence_penalty=0.1
+            model="gemini-1.5-flash-latest",
+            temperature=0.1,
+            top_p=0.9,
         )
-        prompt = PromptTemplate(template=prompt_template, input_variables=["context", "submission"])
-        return load_qa_chain(model, chain_type="stuff", prompt=prompt) # "stuff" is good for moderate context size
     except Exception as e:
-        st.error(f"Failed to initialize Google Chat Model or QA Chain: {e}")
+        st.error(f"Failed to initialize Google Chat Model: {e}")
         return None
+
+    # Define the retriever
+    retriever = vector_store.as_retriever(search_kwargs={'k': 10})
+
+    # Create the Conversational Retrieval Chain
+    try:
+        conversation_chain = ConversationalRetrievalChain.from_llm(
+            llm=llm,
+            retriever=retriever,
+            memory=memory,
+            # --- Inject the custom prompt for the document combination step ---
+            combine_docs_chain_kwargs={"prompt": CUSTOM_PROMPT},
+            # --- ---
+            return_source_documents=True,
+            output_key='answer',
+            # verbose=True # Set to True for detailed debugging if it fails
+        )
+        print("ConversationalRetrievalChain created with custom combine_docs prompt.")
+        # Add a warning about potential issues
+        st.warning("Note: Using a custom prompt that may not fully support chat history or standard input variables. Conversational context might be limited.")
+        return conversation_chain
+
+    except Exception as e:
+         # Catch potential errors during chain creation due to mismatched variables
+         st.error(f"Error creating ConversationalRetrievalChain, possibly due to prompt variable mismatch: {e}")
+         print(f"Chain creation error: {e}")
+         return None
 
 # --- Core Compliance Check ---
 
-def check_compliance(user_submission):
-    """Performs similarity search and runs the QA chain."""
+# --- Core Compliance Check (Modified for Conversation) ---
+
+def check_compliance_with_history(user_submission):
+    """Performs document retrieval and runs the conversational QA chain using history."""
     vector_store = None
-    relevant_docs = []
-    response = {"output_text": "Could not process the request. Please check logs."} # Default error response
+    response = {"answer": "Could not process the request. Please check logs."} # Default error, note key is 'answer'
+    source_documents = []
+
+    # Retrieve memory from session state
+    if 'memory' not in st.session_state:
+         st.error("Chat memory not found in session state.")
+         return {"answer": "Error: Chat history is missing."}, []
+    memory = st.session_state.memory
 
     try:
-        # Load vector store (this happens on each request, consider caching if slow)
+        # Load vector store (consider caching)
         with st.spinner("Loading knowledge base..."):
              vector_store = load_vector_store_from_github()
 
         if vector_store is None:
             st.error("Failed to load the knowledge base (vector store). Cannot proceed.")
-            return {"output_text": "Error: Knowledge base could not be loaded."}, []
+            return {"answer": "Error: Knowledge base could not be loaded."}, []
 
-        print(f"User Submission for Similarity Search: '{user_submission}'")
-        # Perform similarity search
-        with st.spinner("Searching relevant documents..."):
-            relevant_docs = vector_store.similarity_search(user_submission, k=15) # Reduced k slightly
-
-        if not relevant_docs:
-            print("No relevant documents found by similarity search!")
-            st.warning("Could not find relevant documents for your query in the knowledge base.")
-            # Provide a specific message if no docs are found
-            return {"output_text": "I couldn't find specific information related to your query in the available ICDR documents."}, []
-        else:
-            print(f"Number of relevant documents retrieved: {len(relevant_docs)}")
-            # Optional: Print metadata of retrieved docs for debugging
-            # for i, doc in enumerate(relevant_docs[:3]):
-            #     print(f"  Doc {i+1} Metadata: {doc.metadata}")
-            #     print(f"  Doc {i+1} Content Preview: {doc.page_content[:100]}...")
-
-        # Get the QA chain
-        chain = get_compliance_chain()
+        # Get the Conversational QA chain (pass vector store and memory)
+        chain = get_conversational_compliance_chain(vector_store, memory)
         if chain is None:
              st.error("Failed to create the QA processing chain.")
-             return {"output_text": "Error: Could not initialize the analysis process."}, relevant_docs # Return docs found so far
+             return {"answer": "Error: Could not initialize the analysis process."}, []
 
-        # Run the QA chain
-        print("Running QA chain...")
-        with st.spinner("Analyzing query against documents..."):
-            response = chain(
-                {"input_documents": relevant_docs, "submission": user_submission},
-                return_only_outputs=True
-            )
-        print("QA chain finished.")
+        # Run the Conversational QA chain
+        # The chain automatically uses the 'question' key and pulls from memory
+        print(f"Running Conversational QA chain with question: '{user_submission}'")
+        with st.spinner("Analyzing query with history..."):
+            # The chain expects a dictionary, typically with 'question'
+            response = chain({"question": user_submission})
+            # The memory is automatically updated by the chain itself
+
+        print("Conversational QA chain finished.")
+        # Extract source documents if returned
+        source_documents = response.get('source_documents', [])
+        # Debug: Print source document metadata
+        # if source_documents:
+        #     print(f"Retrieved {len(source_documents)} source documents:")
+        #     for i, doc in enumerate(source_documents):
+        #          print(f"  Doc {i+1} Metadata: {doc.metadata}")
+
 
     except Exception as e:
-        st.error(f"An error occurred during the compliance check: {e}")
+        st.error(f"An error occurred during the conversational compliance check: {e}")
         import traceback
-        print(f"Compliance check error traceback:\n{traceback.format_exc()}")
-        # Ensure response is always a dictionary
-        response = {"output_text": f"An unexpected error occurred while processing your request. Please try again later or contact support if the issue persists."}
+        print(f"Conversational check error traceback:\n{traceback.format_exc()}")
+        response = {"answer": f"An unexpected error occurred. Please try again."} # Ensure key is 'answer'
 
-    # Ensure the function always returns the response dictionary and the list of docs
-    return response, relevant_docs
+    # Return the response dictionary and source documents
+    # The response dictionary now contains 'chat_history', 'question', 'answer', 'source_documents'
+    return response, source_documents # Return full response dict and docs
 
-
+# --- Main Chatbot Interface ---
 # --- Main Chatbot Interface ---
 
 def run_chatbot():
-    """Runs the Streamlit chatbot interface."""
+    """Runs the Streamlit chatbot interface with conversation history."""
     display_logo()
 
-    # Display chat history
+    # Display chat history (remains the same)
     if st.session_state.messages:
         for message in st.session_state.messages:
             role_class = "user" if message['role'] == 'user' else 'assistant'
             with st.container():
-                # Use markdown with custom div for styling
                 st.markdown(f"""
                     <div class="chat-message {role_class}">
                         <b>{message['role'].title()}:</b><br>{message['content']}
@@ -528,31 +582,38 @@ def run_chatbot():
                     unsafe_allow_html=True
                 )
 
-    # User input area at the bottom
-    user_query = st.chat_input("Ask about ICDR regulations:") # Changed to st.chat_input
+    # User input area
+    user_query = st.chat_input("Ask about ICDR regulations:")
 
     if user_query:
-        # Add user message to chat history and display it immediately
+        # Add user message to session state chat history (for display)
         st.session_state.messages.append({"role": "user", "content": user_query})
-        with st.chat_message("user"): # Use Streamlit's native chat message display
+        # Display user message
+        with st.chat_message("user"):
              st.markdown(user_query)
 
-        # Get AI response
-        # No spinner here as processing happens within check_compliance which has spinners
-        ai_response_dict, _ = check_compliance(user_query) # Get the dictionary response
-        ai_response_text = ai_response_dict.get('output_text', "Sorry, I encountered an issue processing your request.") # Safely get text
+        # Get AI response using the conversational chain
+        # This function now also updates st.session_state.memory internally via the chain
+        ai_response_dict, _ = check_compliance_with_history(user_query)
 
-        # Add assistant response to chat history and display it
+        # Extract the actual answer text (key is 'answer' now)
+        ai_response_text = ai_response_dict.get('answer', "Sorry, I encountered an issue processing your request.")
+
+        # Add assistant response to session state chat history (for display)
         st.session_state.messages.append({"role": "assistant", "content": ai_response_text})
-        with st.chat_message("assistant"): # Use Streamlit's native chat message display
+        # Display assistant response
+        with st.chat_message("assistant"):
              st.markdown(ai_response_text)
 
-        # No need to rerun manually with st.chat_input, it handles the flow better
+        # No st.rerun() needed with st.chat_input
 
-    # Add a clear chat button in the sidebar or main area if desired
+    # Add a clear chat button
     if st.sidebar.button("Clear Chat History"):
-        st.session_state.messages = []
-        st.rerun() # Rerun to clear the display
+        st.session_state.messages = [] # Clear display history
+        # Clear the Langchain memory
+        if 'memory' in st.session_state:
+            st.session_state.memory.clear()
+        st.rerun() # Rerun to clear the display and memory state
 
 
 # --- Application Entry Point ---

@@ -424,10 +424,10 @@ def load_vector_store_from_github():
 # --- Add PromptTemplate import ---
 from langchain.prompts import PromptTemplate # Make sure this is imported
 
-# --- QA Chain Setup (Modified for Conversation with Specific Prompt Attempt) ---
+# --- QA Chain Setup (Corrected for Conversation) ---
 
 def get_conversational_compliance_chain(vector_store, memory):
-    """Creates a ConversationalRetrievalChain attempting to use a specific prompt."""
+    """Creates a ConversationalRetrievalChain with a prompt compatible with history and standard inputs."""
     global google_api_key
     if not google_api_key:
         st.error("Google API Key not configured. Cannot initialize QA model.")
@@ -439,28 +439,32 @@ def get_conversational_compliance_chain(vector_store, memory):
          st.error("Memory object not available. Cannot create chain.")
          return None
 
-    # --- Define the User's Exact Prompt ---
-    # WARNING: This prompt lacks {chat_history} and uses {submission} instead of {question}
-    # This will likely limit conversational ability and may cause errors.
-    user_prompt_template = """
-    You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context.
+    # --- Define the CORRECTED Prompt Template ---
+    # This version uses {question} (provided by the chain) and includes {chat_history}
+    corrected_prompt_template = """
+    You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context and the ongoing conversation history.
 
     When analyzing queries, please:
-    1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs.
-    2. Explain procedures and requirements clearly
-    3. Highlight any relevant deadlines or time limits
-    4. Provide accurate interpretations of ICDR rules and guidelines
-    5. If information is not covered in the ICDR documents, explicitly state that
+    1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs found in the context documents.
+    2. Explain procedures and requirements clearly based on the context and history.
+    3. Highlight any relevant deadlines or time limits mentioned.
+    4. Provide accurate interpretations of ICDR rules and guidelines based *only* on the provided context and chat history.
+    5. If information is not covered in the documents or conversation, explicitly state that.
 
-    Context (ICDR Documentation):\n {context} \n
-    User Question:\n {submission} \n
+    Chat History:
+    {chat_history}
+
+    Context (ICDR Documentation):
+    {context}
+
+    User Question:
+    {question}
 
     ICDR Analysis and Response:
     """
-    # --- Create PromptTemplate object ---
-    # Note: Input variables MUST match the prompt string.
-    CUSTOM_PROMPT = PromptTemplate(
-        template=user_prompt_template, input_variables=["context", "submission"]
+    # --- Create PromptTemplate object with CORRECT input variables ---
+    CORRECTED_PROMPT = PromptTemplate(
+        template=corrected_prompt_template, input_variables=["chat_history", "context", "question"]
     )
     # --- ---
 
@@ -477,7 +481,7 @@ def get_conversational_compliance_chain(vector_store, memory):
         return None
 
     # Define the retriever
-    retriever = vector_store.as_retriever(search_kwargs={'k': 10})
+    retriever = vector_store.as_retriever(search_kwargs={'k': 10}) # Adjust k if needed
 
     # Create the Conversational Retrieval Chain
     try:
@@ -485,24 +489,21 @@ def get_conversational_compliance_chain(vector_store, memory):
             llm=llm,
             retriever=retriever,
             memory=memory,
-            # --- Inject the custom prompt for the document combination step ---
-            combine_docs_chain_kwargs={"prompt": CUSTOM_PROMPT},
+            # --- Inject the CORRECTED prompt ---
+            combine_docs_chain_kwargs={"prompt": CORRECTED_PROMPT},
             # --- ---
             return_source_documents=True,
             output_key='answer',
-            # verbose=True # Set to True for detailed debugging if it fails
+            # verbose=True # Keep for debugging if needed initially
         )
-        print("ConversationalRetrievalChain created with custom combine_docs prompt.")
-        # Add a warning about potential issues
-        st.warning("Note: Using a custom prompt that may not fully support chat history or standard input variables. Conversational context might be limited.")
+        print("ConversationalRetrievalChain created with corrected prompt.")
+        # Removed the previous warning as the prompt is now compatible
         return conversation_chain
 
     except Exception as e:
-         # Catch potential errors during chain creation due to mismatched variables
-         st.error(f"Error creating ConversationalRetrievalChain, possibly due to prompt variable mismatch: {e}")
+         st.error(f"Error creating ConversationalRetrievalChain: {e}")
          print(f"Chain creation error: {e}")
          return None
-
 # --- Core Compliance Check ---
 
 # --- Core Compliance Check (Modified for Conversation) ---

@@ -559,7 +559,7 @@ def check_compliance_with_history(user_submission):
         # Run the Conversational QA chain
         # The chain automatically uses the 'question' key and pulls from memory
         print(f"Running Conversational QA chain with question: '{user_submission}'")
-        with st.spinner("Analyzing query with history..."):
+        with st.spinner("Analyzing query with document and history..."):
             # The chain expects a dictionary, typically with 'question'
             response = chain({"question": user_submission})
             # The memory is automatically updated by the chain itself

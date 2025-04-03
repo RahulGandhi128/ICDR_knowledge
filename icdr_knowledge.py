@@ -631,7 +631,7 @@ def run_chatbot():
         # No st.rerun() needed with st.chat_input
 
     # Add a clear chat button
-    if st.sidebar.button("Clear Chat History"):
+    if st.button("Clear Chat History"):
         st.session_state.messages = [] # Clear display history
         # Clear the Langchain memory
         if 'memory' in st.session_state:

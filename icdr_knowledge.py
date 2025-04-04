@@ -361,8 +361,8 @@ def load_vector_store_from_github():
 
 
     # --- IMPORTANT: Update these URLs to your actual GitHub raw file paths ---
-    faiss_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.faiss"
-    pkl_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_icdr/index.pkl"
+    faiss_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_combined/index.faiss"
+    pkl_url = "https://raw.githubusercontent.com/RahulGandhi128/ICDR_knowledge/main/faiss_index_combined/index.pkl"
     # --- ---
 
     vector_store = None

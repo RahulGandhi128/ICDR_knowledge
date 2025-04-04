@@ -445,7 +445,7 @@ def get_conversational_compliance_chain(vector_store, memory):
     # --- Define the CORRECTED Prompt Template for Answer Generation ---
     # (This is the same as the previous fix)
     corrected_prompt_template = """
-    You are an expert AI assistant specializing in ICDR (ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS and Section 62 of companies act 2013) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context and the ongoing conversation history.
+    You are an expert AI assistant specializing in ICDR and Section 62(ISSUE OF CAPITAL AND DISCLOSURE REQUIREMENTS and Section 62 of companies act 2013) regulations and procedures. Your role is to provide accurate guidance and interpretation of ICDR rules and procedures based on the official ICDR documentation provided in the context and the ongoing conversation history.
 
     When analyzing queries, please:
     1. Reference specific ICDR articles and sections when applicable with page numbers and paragraphs found in the context documents.
